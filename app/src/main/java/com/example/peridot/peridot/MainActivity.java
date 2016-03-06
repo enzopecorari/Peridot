@@ -26,7 +26,7 @@ import java.util.List;
  * status bar and navigation/system bar) with user interaction.
  */
 
-
+//main activity class
 public class MainActivity extends AppCompatActivity {
 
     protected  GetWifiManager wfm;
