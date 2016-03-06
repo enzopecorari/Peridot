@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Peridot</string>
+
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">CARTELERIA\nDIGITAL</string>
+    <string name="wifi_error_content">No se encontró la configuración WiFi\n1- Desconecte el dispositivo usb del dongle y conéctelo a una PC\n2- Ejecute el archivo wifi-config.jar y siga las instrucciones\n3- Vuelva a conectar el dispositivo USB al dongle
+    </string>
+    <string name="wifi_connected">CONECTADO</string>
+    <string name="wifi_error_password_content">No se pudo conectar al WiFI, verifique que la contraseña es correcta\n\n1- Desconecte el dispositivo usb del dongle y conéctelo a una PC\n2- Ejecute el archivo wifi-config.jar y siga las instrucciones\n3- Vuelva a conectar el dispositivo USB al dongle
+    </string>
+
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+
+
+</resources>
