@@ -171,7 +171,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "estoyyyyyyy casi");
             ((TextView)findViewById(R.id.fullscreen_content)).setText(getResources().getString(R.string.wifi_connected));
             Intent intent = new Intent(this, FullscreenVideoActivity.class);
-            //startActivity(intent);
+            startActivity(intent);
         }
 
 
