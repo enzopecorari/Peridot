@@ -1,7 +1,11 @@
 package com.example.peridot.peridot;
 
 import android.annotation.SuppressLint;
+import android.app.Fragment;
+import android.app.FragmentManager;
+import android.app.FragmentTransaction;
 import android.content.Context;
+import android.content.Intent;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
@@ -13,6 +17,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import java.io.BufferedReader;
@@ -38,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     protected String usbSsidPassword;
     protected Boolean conectado = false;
     protected Boolean foundFile = false;
+    protected Boolean debug = true;
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -160,6 +166,12 @@ public class MainActivity extends AppCompatActivity {
             }else{
                 ((TextView)findViewById(R.id.fullscreen_content)).setText(getResources().getString(R.string.wifi_error_password_content));
             }
+        }
+        if(debug){
+            Log.i(TAG, "estoyyyyyyy casi");
+            ((TextView)findViewById(R.id.fullscreen_content)).setText(getResources().getString(R.string.wifi_connected));
+            Intent intent = new Intent(this, FullscreenVideoActivity.class);
+            //startActivity(intent);
         }
 
 
