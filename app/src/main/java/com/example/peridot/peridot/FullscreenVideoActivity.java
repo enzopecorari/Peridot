@@ -12,6 +12,8 @@ import android.text.format.Time;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.MediaController;
+import android.widget.VideoView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -73,7 +75,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         }
     };
-    private View mControlsView;
     private final Runnable mShowPart2Runnable = new Runnable() {
         @Override
         public void run() {
@@ -82,7 +83,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
             if (actionBar != null) {
                 actionBar.show();
             }
-            mControlsView.setVisibility(View.VISIBLE);
         }
     };
     private boolean mVisible;
@@ -92,20 +92,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
             hide();
         }
     };
-    /**
-     * Touch listener to use for in-layout UI controls to delay hiding the
-     * system UI. This is to prevent the jarring behavior of controls going away
-     * while interacting with activity UI.
-     */
-    private final View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            if (AUTO_HIDE) {
-                delayedHide(AUTO_HIDE_DELAY_MILLIS);
-            }
-            return false;
-        }
-    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,17 +101,10 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         setContentView(R.layout.activity_fullscreen_video);
 
         mVisible = true;
-        mControlsView = findViewById(R.id.fullscreen_content_controls);
-        mContentView = findViewById(R.id.fullscreen_content);
+        mContentView = findViewById(R.id.my_video_view);
 
 
-        // Set up the user interaction to manually show or hide the system UI.
-        mContentView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggle();
-            }
-        });
+
 
         FetchVideoTask videoTask = new FetchVideoTask();
         videoTask.execute("video1.mp4");
@@ -141,13 +121,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         delayedHide(100);
     }
 
-    private void toggle() {
-        if (mVisible) {
-            hide();
-        } else {
-            show();
-        }
-    }
 
     private void hide() {
         // Hide UI first
@@ -164,14 +137,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
     @SuppressLint("InlinedApi")
     private void show() {
-        // Show the system bar
-        mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        mVisible = true;
 
-        // Schedule a runnable to display UI elements after a delay
-        mHideHandler.removeCallbacks(mHidePart2Runnable);
-        mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
     }
 
     /**
@@ -197,10 +163,13 @@ public class FullscreenVideoActivity extends AppCompatActivity {
             }
             String videoName = params[0];
             String videoLocalURI = getFilesDir().toString() + "/" + videoName;
-
+            String[] resultStrs = new String[1];
+            resultStrs[0] = videoLocalURI;
             File file = new File(videoLocalURI);
             if(file.exists()){
                 Log.i(LOG_TAG, "Video found");
+
+                return resultStrs;
             }
             else{
                 Log.i(LOG_TAG, "Video not found");
@@ -241,6 +210,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                             + ((System.currentTimeMillis() - startTime) / 1000)
                             + " sec");
                     Log.i(LOG_TAG, getFilesDir().toString());
+                    return resultStrs;
                 } catch (MalformedURLException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -256,6 +226,12 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         protected void onPostExecute(String[] result) {
             if (result != null) {
                 Log.i(LOG_TAG, "on post execute");
+                //videoHolder = new VideoView(this);
+                VideoView videoHolder = (VideoView)findViewById(R.id.my_video_view);
+                videoHolder.setMediaController(new MediaController(getApplicationContext()));
+                videoHolder.setVideoURI(Uri.parse(result[0]));
+                videoHolder.requestFocus();
+                videoHolder.start();
             }
         }
     }
