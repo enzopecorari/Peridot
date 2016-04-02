@@ -1,6 +1,7 @@
 package com.example.peridot.peridot;
 
 import android.annotation.SuppressLint;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
@@ -10,8 +11,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.text.format.Time;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.MediaController;
 import android.widget.VideoView;
 
@@ -42,9 +45,13 @@ public class FullscreenVideoActivity extends AppCompatActivity {
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
      */
+    private final String LOG_TAG = FetchVideoTask.class.getSimpleName();
     private static final boolean AUTO_HIDE = true;
     private final int TIMEOUT_CONNECTION = 5000;//5sec
     private final int TIMEOUT_SOCKET = 30000;//30sec
+    private int position = 1;
+    private MediaController mMediaController;
+    private VideoView videoHolder;
     /**
      * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
      * user interaction before hiding the system UI.
@@ -86,6 +93,12 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         }
     };
     private boolean mVisible;
+
+
+
+
+
+
     private final Runnable mHideRunnable = new Runnable() {
         @Override
         public void run() {
@@ -97,18 +110,89 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        mMediaController = new MediaController(this);
         setContentView(R.layout.activity_fullscreen_video);
-
         mVisible = true;
         mContentView = findViewById(R.id.my_video_view);
 
+        if (savedInstanceState != null)
+        {
+            position = savedInstanceState.getInt("position");
+        }
+        videoHolder = (VideoView)findViewById(R.id.my_video_view);
+        videoHolder.setMediaController(mMediaController);
 
+        videoHolder.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent motionEvent) {
+                if (videoHolder.isPlaying()) {
+                    videoHolder.pause();
+                    hide();
+                    mMediaController.show(0);
+                    position = videoHolder.getCurrentPosition();
+                    return false;
+                } else {
+
+                    mMediaController.show(0);
+                    videoHolder.seekTo(position);
+                    videoHolder.start();
+                    hide();
+                    return false;
+                }
+            }
+        });
+
+        videoHolder.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mediaPlayer) {
+                videoHolder.seekTo(1);
+            }
+        });
+
+        videoHolder.setOnInfoListener(new MediaPlayer.OnInfoListener() {
+            @Override
+            public boolean onInfo(MediaPlayer mediaPlayer,  int what, int extra) {
+                Log.i(LOG_TAG, "on info");
+                return true;
+            }
+        });
+
+        videoHolder.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+            @Override
+            public boolean onError(MediaPlayer mediaPlayer,  int what, int extra) {
+                Log.i(LOG_TAG, "on error");
+                return true;
+            }
+        });
+
+        if (position != 1)
+        {
+            videoHolder.seekTo(position);
+            videoHolder.start();
+        }
+        else
+        {
+            //from beginning
+            videoHolder.seekTo(1);
+        }
 
 
         FetchVideoTask videoTask = new FetchVideoTask();
         videoTask.execute("video1.mp4");
 
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState)
+    {
+        super.onSaveInstanceState(savedInstanceState);
+
+        if (videoHolder != null)
+        {
+            savedInstanceState.putInt("position", videoHolder.getCurrentPosition());
+        }
+
+        videoHolder.pause();
     }
 
     @Override
@@ -120,7 +204,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         // are available.
         delayedHide(100);
     }
-
 
     private void hide() {
         // Hide UI first
@@ -140,10 +223,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
     }
 
-    /**
-     * Schedules a call to hide() in [delay] milliseconds, canceling any
-     * previously scheduled calls.
-     */
     private void delayedHide(int delayMillis) {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
@@ -155,7 +234,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
         @Override
         protected String[] doInBackground(String... params) {
-
 
             // If there's no video url, there's nothing to look up.  Verify size of params.
             if (params.length == 0) {
@@ -187,9 +265,8 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     ucon.setReadTimeout(TIMEOUT_CONNECTION);
                     ucon.setConnectTimeout(TIMEOUT_SOCKET);
 
-
                     //Define InputStreams to read from the URLConnection.
-                    // uses 3KB download buffer
+                    // uses 3KB download buffer  ¿3KB?
                     InputStream is = ucon.getInputStream();
                     BufferedInputStream inStream = new BufferedInputStream(is, 1024 * 5);
                     FileOutputStream outStream = openFileOutput(videoName, MODE_PRIVATE);
@@ -199,7 +276,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     int len;
                     while ((len = inStream.read(buff)) != -1)
                     {
-                        outStream.write(buff,0,len);
+                        outStream.write(buff, 0, len);
                     }
 
                     //clean up
@@ -209,7 +286,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     Log.i(LOG_TAG, "download completed in "
                             + ((System.currentTimeMillis() - startTime) / 1000)
                             + " sec");
-                    Log.i(LOG_TAG, getFilesDir().toString());
                     return resultStrs;
                 } catch (MalformedURLException e) {
                     e.printStackTrace();
@@ -225,13 +301,13 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String[] result) {
             if (result != null) {
-                Log.i(LOG_TAG, "on post execute");
-                //videoHolder = new VideoView(this);
-                VideoView videoHolder = (VideoView)findViewById(R.id.my_video_view);
-                videoHolder.setMediaController(new MediaController(getApplicationContext()));
                 videoHolder.setVideoURI(Uri.parse(result[0]));
                 videoHolder.requestFocus();
                 videoHolder.start();
+
+                //hide UI
+                hide();
+                mMediaController.show(0);
             }
         }
     }
