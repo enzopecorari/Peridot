@@ -35,6 +35,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -52,6 +54,9 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     private int position = 1;
     private MediaController mMediaController;
     private VideoView videoHolder;
+
+
+    private LinkedList<Video> currentVideos = new LinkedList<>();
     /**
      * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
      * user interaction before hiding the system UI.
@@ -110,6 +115,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         mMediaController = new MediaController(this);
         setContentView(R.layout.activity_fullscreen_video);
         mVisible = true;
@@ -151,7 +157,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
         videoHolder.setOnInfoListener(new MediaPlayer.OnInfoListener() {
             @Override
-            public boolean onInfo(MediaPlayer mediaPlayer,  int what, int extra) {
+            public boolean onInfo(MediaPlayer mediaPlayer, int what, int extra) {
                 Log.i(LOG_TAG, "on info");
                 return true;
             }
@@ -177,8 +183,8 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         }
 
 
-        FetchVideoTask videoTask = new FetchVideoTask();
-        videoTask.execute("video1.mp4");
+        FetchVideoListTask videoListTask = new FetchVideoListTask();
+        videoListTask.execute("123456");
 
     }
 
@@ -239,19 +245,19 @@ public class FullscreenVideoActivity extends AppCompatActivity {
             if (params.length == 0) {
                 return null;
             }
-            String videoName = params[0];
-            String videoLocalURI = getFilesDir().toString() + "/" + videoName;
+            String videoLocalURI = params[1];
             String[] resultStrs = new String[1];
+            String videoName = params[3];
+            long size = (Long.parseLong(params[2]));
             resultStrs[0] = videoLocalURI;
             File file = new File(videoLocalURI);
             if(file.exists()){
-                Log.i(LOG_TAG, "Video found");
-
+                Log.i(LOG_TAG, "Video found SHOULD NOT HAPPEN");
                 return resultStrs;
             }
             else{
                 Log.i(LOG_TAG, "Video not found");
-                String videoURL = "http://www.tablero.hostingbahia.com.ar/Peridot/" + videoName;
+                String videoURL = params[0];
                 URL url = null;
                 try {
                     url = new URL(videoURL);
@@ -274,9 +280,12 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
                     //Read bytes (and store them) until there is nothing more to read(-1)
                     int len;
+                    long downloaded = 0;
                     while ((len = inStream.read(buff)) != -1)
                     {
                         outStream.write(buff, 0, len);
+                        downloaded ++;
+                        Log.i(LOG_TAG, "downloaded: " + downloaded + "/" + size);
                     }
 
                     //clean up
@@ -301,13 +310,166 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String[] result) {
             if (result != null) {
-                videoHolder.setVideoURI(Uri.parse(result[0]));
-                videoHolder.requestFocus();
-                videoHolder.start();
+                //videoHolder.setVideoURI(Uri.parse(result[0]));
+                //videoHolder.requestFocus();
+                //videoHolder.start();
 
                 //hide UI
                 hide();
                 mMediaController.show(0);
+            }
+        }
+    }
+
+    public class FetchVideoListTask extends AsyncTask<String, Void, Video[]> {
+
+        private final String LOG_TAG = FetchVideoListTask.class.getSimpleName();
+
+        /**
+         * Take the String representing the complete list of videos in JSON Format and
+         * pull out the data we need to construct the Strings needed for the wireframes.
+         */
+        private Video[] getVideoListDataFromJson(String videoListJsonStr)
+                throws JSONException {
+
+            // These are the names of the JSON objects that need to be extracted.
+            final String OWM_LIST = "video-list";
+            final String OWM_LINK = "link";
+            final String OWM_VOLUME = "volume";
+            final String OWM_DURATION = "duration";
+            final String OWM_RESOLUTION_X = "resolution_x";
+            final String OWM_RESOLUTION_Y = "resolution_y";
+            final String OWM_FILESIZE = "filesize";
+            final String OWM_VIDEONAME = "video-name";
+
+
+            JSONObject videoListJson = new JSONObject(videoListJsonStr);
+            JSONArray videoArray = videoListJson.getJSONArray(OWM_LIST);
+            Log.i(LOG_TAG, videoArray.length()+" tamaño del array");
+            Video[] resultStrs = new Video[videoArray.length()];
+            for(int i = 0; i < videoArray.length(); i++) {
+
+                String link;
+                String volume;
+                String duration;
+                long size;
+                String resolution_x;
+                String resolution_y;
+                String videoName;
+
+                // Get the JSON object representing the video
+                JSONObject video = videoArray.getJSONObject(i);
+
+                link = video.getString(OWM_LINK);
+                volume = video.getString(OWM_VOLUME);
+                duration = video.getString(OWM_DURATION);
+                resolution_x = video.getString(OWM_RESOLUTION_X);
+                resolution_y = video.getString(OWM_RESOLUTION_Y);
+                size = video.getLong(OWM_FILESIZE);
+                videoName = video.getString(OWM_VIDEONAME);
+
+                resultStrs[i] = new Video(link, volume, duration, resolution_x, resolution_y, size, getFilesDir().toString() + "/" + videoName, videoName);
+            }
+            return resultStrs;
+
+        }
+
+        @Override
+        protected Video[] doInBackground(String... params) {
+
+            // If there's no id, there's nothing to look up.  Verify size of params.
+            if (params.length == 0) {
+                return null;
+            }
+            String id = params[0];
+
+            // These two need to be declared outside the try/catch
+            // so that they can be closed in the finally block.
+            HttpURLConnection urlConnection = null;
+            BufferedReader reader = null;
+
+            // Will contain the raw JSON response as a string.
+            String videoListJsonStr = null;
+
+            try {
+                // Construct the URL for the API query
+                final String API_BASE_URL =
+                        "http://tableroweb.com.ar/Peridot/video-list.php?";
+                final String ID_PARAM = "id";
+
+                Uri builtUri = Uri.parse(API_BASE_URL).buildUpon()
+                        .appendQueryParameter(ID_PARAM, id)
+                        .build();
+
+                URL url = new URL(builtUri.toString());
+
+                // Create the request to API, and open the connection
+                urlConnection = (HttpURLConnection) url.openConnection();
+                urlConnection.setRequestMethod("GET");
+                urlConnection.connect();
+
+                // Read the input stream into a String
+                InputStream inputStream = urlConnection.getInputStream();
+                StringBuffer buffer = new StringBuffer();
+                if (inputStream == null) {
+                    // Nothing to do.
+                    return null;
+                }
+                reader = new BufferedReader(new InputStreamReader(inputStream));
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // Since it's JSON, adding a newline isn't necessary (it won't affect parsing)
+                    // But it does make debugging a *lot* easier if you print out the completed
+                    // buffer for debugging.
+                    buffer.append(line + "\n");
+                }
+
+                if (buffer.length() == 0) {
+                    // Stream was empty.  No point in parsing.
+                    return null;
+                }
+                videoListJsonStr = buffer.toString();
+            } catch (IOException e) {
+                Log.e(LOG_TAG, "Error ", e);
+                // If the code didn't successfully get the weather data, there's no point in attemping
+                // to parse it.
+                return null;
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+                if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (final IOException e) {
+                        Log.e(LOG_TAG, "Error closing stream", e);
+                    }
+                }
+            }
+
+            try {
+                return getVideoListDataFromJson(videoListJsonStr);
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage(), e);
+                e.printStackTrace();
+            }
+
+            // This will only happen if there was an error getting or parsing the data.
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Video[] result) {
+            if (result != null) {
+                for(Video video : result) {
+                    currentVideos.add(video);
+                    if(!video.checkAvailability()){
+                        new FetchVideoTask().execute(video.link, video.videoLocalURI, ((Long) video.size).toString(), video.videoName);
+                    }
+                    Log.i(LOG_TAG, video.toString());
+                }
+                //call video manager
             }
         }
     }
