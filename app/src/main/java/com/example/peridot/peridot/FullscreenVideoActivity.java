@@ -51,16 +51,16 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     private static final boolean AUTO_HIDE = true;
     private final int TIMEOUT_CONNECTION = 5000;//5sec
     private final int TIMEOUT_SOCKET = 30000;//30sec
-    private int position = 1;
     private MediaController mMediaController;
     private VideoView videoHolder;
 
 
     private LinkedList<Video> currentVideos = new LinkedList<>();
+    private int position = 1;
+    private int currentVideo = 0;
     /**
      * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
      * user interaction before hiding the system UI.
-     */
     private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
 
     /**
@@ -151,7 +151,12 @@ public class FullscreenVideoActivity extends AppCompatActivity {
         videoHolder.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
-                videoHolder.seekTo(1);
+                currentVideo++;
+                if(currentVideo == currentVideos.size()){
+                    currentVideo = 0;
+                }
+                videoListManager();
+                //videoHolder.seekTo(1);
             }
         });
 
@@ -184,7 +189,7 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
 
         FetchVideoListTask videoListTask = new FetchVideoListTask();
-        videoListTask.execute("123456");
+        videoListTask.execute("123456"); //id app
 
     }
 
@@ -469,8 +474,22 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     }
                     Log.i(LOG_TAG, video.toString());
                 }
+
                 //call video manager
+                videoListManager();
             }
         }
+    }
+
+    public void videoListManager()
+    {
+        Video next = currentVideos.get(currentVideo);
+        videoHolder.setVideoURI(Uri.parse(next.videoLocalURI));
+        Log.i(LOG_TAG, "Reproduzco video de index " + currentVideo);
+        videoHolder.requestFocus();
+        videoHolder.start();
+
+        //hide UI
+        hide();
     }
 }
