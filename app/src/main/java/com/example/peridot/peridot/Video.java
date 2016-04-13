@@ -17,6 +17,7 @@ public class Video {
     protected String videoLocalURI;
     protected boolean available = false;
     protected String videoName;
+    protected boolean verified = false;
     private final String LOG_TAG = "VIDEO";
 
     public Video(String link, String volume)

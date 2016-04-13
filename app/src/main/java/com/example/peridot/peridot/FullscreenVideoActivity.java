@@ -16,6 +16,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.MediaController;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.VideoView;
 
 import org.json.JSONArray;
@@ -43,16 +45,13 @@ import java.util.List;
  * status bar and navigation/system bar) with user interaction.
  */
 public class FullscreenVideoActivity extends AppCompatActivity {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
+
     private final String LOG_TAG = FetchVideoTask.class.getSimpleName();
     private static final boolean AUTO_HIDE = true;
     private final int TIMEOUT_CONNECTION = 5000;//5sec
     private final int TIMEOUT_SOCKET = 30000;//30sec
-    private MediaController mMediaController;
     private VideoView videoHolder;
+    private boolean showingProgress = false;
 
 
     private LinkedList<Video> currentVideos = new LinkedList<>();
@@ -70,55 +69,12 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     private static final int UI_ANIMATION_DELAY = 300;
     private final Handler mHideHandler = new Handler();
     private View mContentView;
-    private final Runnable mHidePart2Runnable = new Runnable() {
-        @SuppressLint("InlinedApi")
-        @Override
-        public void run() {
-            // Delayed removal of status and navigation bar
-
-            // Note that some of these constants are new as of API 16 (Jelly Bean)
-            // and API 19 (KitKat). It is safe to use them, as they are inlined
-            // at compile-time and do nothing on earlier devices.
-            mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        }
-    };
-    private final Runnable mShowPart2Runnable = new Runnable() {
-        @Override
-        public void run() {
-            // Delayed display of UI elements
-            ActionBar actionBar = getSupportActionBar();
-            if (actionBar != null) {
-                actionBar.show();
-            }
-        }
-    };
-    private boolean mVisible;
-
-
-
-
-
-
-    private final Runnable mHideRunnable = new Runnable() {
-        @Override
-        public void run() {
-            hide();
-        }
-    };
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mMediaController = new MediaController(this);
         setContentView(R.layout.activity_fullscreen_video);
-        mVisible = true;
         mContentView = findViewById(R.id.my_video_view);
 
         if (savedInstanceState != null)
@@ -126,25 +82,26 @@ public class FullscreenVideoActivity extends AppCompatActivity {
             position = savedInstanceState.getInt("position");
         }
         videoHolder = (VideoView)findViewById(R.id.my_video_view);
-        videoHolder.setMediaController(mMediaController);
 
         videoHolder.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent motionEvent) {
                 if (videoHolder.isPlaying()) {
                     videoHolder.pause();
-                    hide();
-                    mMediaController.show(0);
                     position = videoHolder.getCurrentPosition();
+                    mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
                     return false;
                 } else {
-
-                    mMediaController.show(0);
                     videoHolder.seekTo(position);
                     videoHolder.start();
-                    hide();
+                    mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
                     return false;
                 }
+
             }
         });
 
@@ -156,7 +113,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     currentVideo = 0;
                 }
                 videoListManager();
-                //videoHolder.seekTo(1);
             }
         });
 
@@ -210,36 +166,16 @@ public class FullscreenVideoActivity extends AppCompatActivity {
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
 
-        // Trigger the initial hide() shortly after the activity has been
-        // created, to briefly hint to the user that UI controls
-        // are available.
-        delayedHide(100);
-    }
-
-    private void hide() {
-        // Hide UI first
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.hide();
         }
-        mVisible = false;
-
-        // Schedule a runnable to remove the status and navigation bar after a delay
-        mHideHandler.removeCallbacks(mShowPart2Runnable);
-        mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
+        mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
     }
 
-    @SuppressLint("InlinedApi")
-    private void show() {
-
-    }
-
-    private void delayedHide(int delayMillis) {
-        mHideHandler.removeCallbacks(mHideRunnable);
-        mHideHandler.postDelayed(mHideRunnable, delayMillis);
-    }
-
-    public class FetchVideoTask extends AsyncTask<String, Void, String[]> {
+    public class FetchVideoTask extends AsyncTask<String, String, String[]> {
 
         private final String LOG_TAG = FetchVideoTask.class.getSimpleName();
 
@@ -277,7 +213,6 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     ucon.setConnectTimeout(TIMEOUT_SOCKET);
 
                     //Define InputStreams to read from the URLConnection.
-                    // uses 3KB download buffer  ¿3KB?
                     InputStream is = ucon.getInputStream();
                     BufferedInputStream inStream = new BufferedInputStream(is, 1024 * 5);
                     FileOutputStream outStream = openFileOutput(videoName, MODE_PRIVATE);
@@ -289,7 +224,9 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                     while ((len = inStream.read(buff)) != -1)
                     {
                         outStream.write(buff, 0, len);
-                        downloaded ++;
+                        downloaded += len;
+                        String t = "Downloading " + videoName + " " + (int)(((float)downloaded / (float)size) * 100 )  + "%";
+                        publishProgress(t, String.valueOf(downloaded), String.valueOf(size));
                         Log.i(LOG_TAG, "downloaded: " + downloaded + "/" + size);
                     }
 
@@ -308,20 +245,25 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                 }
             }
 
-            // This will only happen if there was an error getting or parsing the forecast.
             return null;
         }
 
-        @Override
+        protected void onProgressUpdate(String... progress) {
+            ((TextView)findViewById(R.id.progressText)).setText(progress[0]);
+            ((ProgressBar)findViewById(R.id.progressBar)).setMax(Integer.parseInt(progress[2]));
+            ((ProgressBar)findViewById(R.id.progressBar)).setProgress(Integer.parseInt(progress[1]));
+        }
+
+
+    @Override
         protected void onPostExecute(String[] result) {
             if (result != null) {
-                //videoHolder.setVideoURI(Uri.parse(result[0]));
-                //videoHolder.requestFocus();
-                //videoHolder.start();
-
-                //hide UI
-                hide();
-                mMediaController.show(0);
+                if(showingProgress){
+                    showingProgress = false;
+                    (findViewById(R.id.progressBar)).setVisibility(View.INVISIBLE);
+                    (findViewById(R.id.progressText)).setVisibility(View.INVISIBLE);
+                    videoListManager();
+                }
             }
         }
     }
@@ -466,11 +408,17 @@ public class FullscreenVideoActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(Video[] result) {
+
+
+
             if (result != null) {
                 for(Video video : result) {
+                    Log.i(LOG_TAG, "Videos agrego " + video.videoName);
                     currentVideos.add(video);
                     if(!video.checkAvailability()){
                         new FetchVideoTask().execute(video.link, video.videoLocalURI, ((Long) video.size).toString(), video.videoName);
+                    }else{
+                        video.verified = true;
                     }
                     Log.i(LOG_TAG, video.toString());
                 }
@@ -478,18 +426,61 @@ public class FullscreenVideoActivity extends AppCompatActivity {
                 //call video manager
                 videoListManager();
             }
+            localStorageCleaner(currentVideos);
         }
     }
 
     public void videoListManager()
     {
-        Video next = currentVideos.get(currentVideo);
-        videoHolder.setVideoURI(Uri.parse(next.videoLocalURI));
-        Log.i(LOG_TAG, "Reproduzco video de index " + currentVideo);
-        videoHolder.requestFocus();
-        videoHolder.start();
+        boolean ready = false;
+        for (Video video : currentVideos) {
+            if(video.verified){
+                ready = true;
+            }else{
+                if(video.checkAvailability()){
+                    video.verified = true;
+                    ready = true;
+                }
+            }
+        }
+        if(ready){
+            Video next = currentVideos.get(currentVideo);
+            if(next.verified){
+                videoHolder.setVideoURI(Uri.parse(next.videoLocalURI));
+                Log.i(LOG_TAG, "Reproduzco video de index " + currentVideo);
+                videoHolder.requestFocus();
+                videoHolder.start();
+            }else{
+                currentVideo++;
+                videoListManager();
+            }
+        }else{
+            showingProgress = true;
+            (findViewById(R.id.progressBar)).setVisibility(View.VISIBLE);
+            (findViewById(R.id.progressText)).setVisibility(View.VISIBLE);
+        }
+    }
 
-        //hide UI
-        hide();
+    public void localStorageCleaner(LinkedList<Video> videosToShow){
+        File filesDir = getFilesDir();
+        String[] files = filesDir.list();
+
+        for (String videoFile : files) {
+            boolean needed = false;
+            for (Video video : videosToShow) {
+                Log.i(LOG_TAG, "name 1 " + videoFile);
+                Log.i(LOG_TAG, "name 2: " + video.videoName);
+
+                if(video.videoName.equals(videoFile)){
+                    Log.i(LOG_TAG, "entreeee");
+                    needed = true;
+                }
+            }
+            if(!needed){
+                Log.i(LOG_TAG, getFilesDir().toString() + "/" + videoFile);
+                File file = new File(getFilesDir().toString() + "/" + videoFile);
+                file.delete();
+            }
+        }
     }
 }

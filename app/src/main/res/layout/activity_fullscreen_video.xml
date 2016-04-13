@@ -8,4 +8,24 @@
             android:layout_centerVertical="true"
             android:layout_centerHorizontal="true">
         </VideoView>
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/progressBar"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="120dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:id="@+id/progressText"
+            android:textColor="#ffffff"
+            android:text="        "
+            android:layout_marginBottom="57dp"
+            android:layout_above="@+id/progressBar"
+            android:layout_centerHorizontal="true" />
     </RelativeLayout>
